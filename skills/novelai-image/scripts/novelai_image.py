@@ -22,6 +22,7 @@ from typing import Any
 
 
 DEFAULT_BASE_URL = "https://image.novelai.net"
+DEFAULT_GENERATION_MODEL = "nai-diffusion-5-full"
 DEFAULT_TOKEN_ENV = "NOVELAI_API_TOKEN"
 WINDOWS_CREDENTIAL_TARGET = "NovelAISkill:NOVELAI_API_TOKEN"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -291,6 +292,13 @@ def validate_generation_payload(payload: Any) -> None:
         raise CliError("parameters.v4_prompt.caption.base_caption and parameters.prompt must be identical")
     if "v4_negative_prompt" in parameters and parameters["v4_negative_prompt"]["caption"]["base_caption"] != parameters["negative_prompt"]:
         raise CliError("parameters.v4_negative_prompt.caption.base_caption and parameters.negative_prompt must be identical")
+
+
+def apply_generation_defaults(payload: Any) -> Any:
+    if not isinstance(payload, dict):
+        return payload
+    payload.setdefault("model", DEFAULT_GENERATION_MODEL)
+    return payload
 
 
 def summarize(value: Any) -> Any:
@@ -593,6 +601,7 @@ def maybe_dry_run(args: argparse.Namespace, payload: Any) -> bool:
 
 def command_generate(args: argparse.Namespace) -> None:
     payload = load_payload(args)
+    payload = apply_generation_defaults(payload)
     validate_generation_payload(payload)
     if maybe_dry_run(args, payload):
         return

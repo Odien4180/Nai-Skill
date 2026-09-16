@@ -59,12 +59,14 @@ Generation requests use a fixed canonical schema. The client requires
 identical. Negative prompt copies must also match. Character-only details
 belong in `char_captions`; when `use_coords` is true, every character needs a
 normalized `{x, y}` center. A dry run rejects drift before a paid request.
+When `model` is omitted, the client inserts the default
+`nai-diffusion-5-full`; an explicitly supplied model is never overwritten.
 
 ```json
 {
   "action": "generate",
   "input": "1girl, red hair, cinematic lighting",
-  "model": "MODEL_API_NAME",
+  "model": "nai-diffusion-5-full",
   "parameters": {
     "prompt": "1girl, red hair, cinematic lighting",
     "negative_prompt": "lowres, blurry",

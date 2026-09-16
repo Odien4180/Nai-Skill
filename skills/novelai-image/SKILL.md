@@ -22,7 +22,7 @@ Preserve every explicit choice. Ask only about missing values that could materia
 Before generation, make sure these decisions are resolved:
 
 - Operation and required inputs: text-to-image, img2img, inpaint/outpaint, Enhance, reference mode, Director Tool, or upscale. Inpaint requires both a source image and a mask.
-- Model: verify the current official model/API identifier. If omitted and the model families would produce meaningfully different results, offer 2–3 suitable current choices instead of silently selecting one.
+- Model: default to NAI Diffusion 5 Full (`nai-diffusion-5-full`) when the user omits the model. Preserve any model the user explicitly selects. Verify the official identifier only when the user requests another model or the API rejects the default as unavailable.
 - Prompt: obtain the subject and intended result. If the user gives only a broad idea, offer a faithful drafted prompt and let them choose whether to use or revise it.
 - Composition: resolve aspect ratio or exact image size. Offer portrait, landscape, and square when the request does not imply one; validate the exact dimensions against the selected model before calling.
 - Cost/behavior controls: resolve `n_samples`, `steps`, and guidance/`scale`. Recommend one image unless a batch was requested. Use current model guidance rather than treating one numeric preset as universal.

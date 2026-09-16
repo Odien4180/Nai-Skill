@@ -91,6 +91,19 @@ class ClientTests(unittest.TestCase):
     def test_canonical_generation_schema_accepts_synchronized_prompts(self):
         CLIENT.validate_generation_payload(self.canonical_generation_payload())
 
+    def test_generation_defaults_to_nai5_full(self):
+        payload = self.canonical_generation_payload()
+        del payload["model"]
+        CLIENT.apply_generation_defaults(payload)
+        self.assertEqual(payload["model"], "nai-diffusion-5-full")
+        CLIENT.validate_generation_payload(payload)
+
+    def test_explicit_generation_model_is_preserved(self):
+        payload = self.canonical_generation_payload()
+        payload["model"] = "another-model"
+        CLIENT.apply_generation_defaults(payload)
+        self.assertEqual(payload["model"], "another-model")
+
     def test_generation_schema_rejects_prompt_drift(self):
         payload = self.canonical_generation_payload()
         payload["parameters"]["prompt"] = "a different prompt"
