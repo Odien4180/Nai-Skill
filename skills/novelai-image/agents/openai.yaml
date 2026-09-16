@@ -1,0 +1,4 @@
+interface:
+  display_name: "NovelAI Image"
+  short_description: "Generate and edit images with the NovelAI API"
+  default_prompt: "Use $novelai-image to generate an image from my prompt."
