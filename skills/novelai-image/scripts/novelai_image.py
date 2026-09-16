@@ -314,14 +314,39 @@ def read_windows_credential(target: str = WINDOWS_CREDENTIAL_TARGET) -> str | No
         advapi32.CredFree(credential_pointer)
 
 
+def read_windows_machine_environment(name: str) -> str | None:
+    if os.name != "nt":
+        return None
+
+    import winreg
+
+    key_path = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as key:
+            value, _ = winreg.QueryValueEx(key, name)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise CliError(f"Windows machine environment lookup failed: {exc}") from exc
+
+    if not isinstance(value, str):
+        raise CliError(f"Windows machine environment value {name} is not text")
+    return value.strip() or None
+
+
 def auth_header(token_env: str) -> str:
     if token_env == DEFAULT_TOKEN_ENV:
-        token = (read_windows_credential() or os.environ.get(token_env, "")).strip()
+        token = (
+            os.environ.get(token_env, "").strip()
+            or read_windows_machine_environment(token_env)
+            or read_windows_credential()
+            or ""
+        )
     else:
         token = os.environ.get(token_env, "").strip()
     if not token:
         raise CliError(
-            f"missing NovelAI credentials; install one in Windows Credential Manager or set {token_env}"
+            f"missing NovelAI credentials; install the Windows machine token or set {token_env}"
         )
     return token if token.lower().startswith("bearer ") else f"Bearer {token}"
 

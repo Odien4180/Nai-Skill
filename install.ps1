@@ -256,42 +256,48 @@ Write-Host ''
 if (-not $SkipTokenPrompt -and -not $WhatIfPreference) {
     $isWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
     if (-not $isWindows) {
-        Write-Warning 'Windows Credential Manager is unavailable. Set NOVELAI_API_TOKEN through your platform secret manager.'
+        Write-Warning 'Set NOVELAI_API_TOKEN through your platform secret manager.'
     }
     else {
-        $credentialExists = Test-NovelAiCredential -Target $credentialTarget
-        $tokenPrompt = if (-not $credentialExists) {
+        $machineToken = [Environment]::GetEnvironmentVariable('NOVELAI_API_TOKEN', [EnvironmentVariableTarget]::Machine)
+        $tokenPrompt = if ([string]::IsNullOrWhiteSpace($machineToken)) {
             'NovelAI Persistent API Token (input hidden; press Enter to skip)'
+        } else {
+            'NovelAI Persistent API Token (input hidden; press Enter to keep the existing machine token)'
         }
-        else {
-            'NovelAI Persistent API Token (input hidden; press Enter to keep the existing credential)'
-        }
-
         $secureToken = Read-Host $tokenPrompt -AsSecureString
         if ($secureToken.Length -gt 0) {
-            if ($PSCmdlet.ShouldProcess(
-                $credentialTarget,
-                'Store the NovelAI token in Windows Credential Manager'
-            )) {
-                Save-NovelAiCredential -Target $credentialTarget -Secret $secureToken
-                [Environment]::SetEnvironmentVariable('NOVELAI_API_TOKEN', $null, [EnvironmentVariableTarget]::User)
-                [Environment]::SetEnvironmentVariable('NOVELAI_API_TOKEN', $null, [EnvironmentVariableTarget]::Process)
-                Write-Host 'Saved the NovelAI token in Windows Credential Manager.'
+            $secretPointer = [IntPtr]::Zero
+            try {
+                $secretPointer = [Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($secureToken)
+                $plainToken = [Runtime.InteropServices.Marshal]::PtrToStringUni($secretPointer)
+                if ([string]::IsNullOrWhiteSpace($plainToken)) { throw 'The NovelAI token cannot contain only whitespace.' }
+                [Environment]::SetEnvironmentVariable('NOVELAI_API_TOKEN', $plainToken, [EnvironmentVariableTarget]::Machine)
+                Write-Host 'Saved the NovelAI token in the Windows machine environment.'
             }
-            $secureToken.Dispose()
+            catch [UnauthorizedAccessException] {
+                throw 'Administrator privileges are required to save the Windows machine token. Re-run the installer as administrator.'
+            }
+            finally {
+                if ($secretPointer -ne [IntPtr]::Zero) {
+                    [Runtime.InteropServices.Marshal]::ZeroFreeCoTaskMemUnicode($secretPointer)
+                }
+                $plainToken = $null
+                $secureToken.Dispose()
+            }
         }
-        elseif (-not $credentialExists) {
+        elseif ([string]::IsNullOrWhiteSpace($machineToken)) {
             $secureToken.Dispose()
-            Write-Warning 'Token setup was skipped. Store the credential or set NOVELAI_API_TOKEN before using the skill.'
+            Write-Warning 'Token setup was skipped. Set NOVELAI_API_TOKEN before using the skill.'
         }
         else {
             $secureToken.Dispose()
-            Write-Host 'Kept the existing NovelAI credential.'
+            Write-Host 'Kept the existing Windows machine token.'
         }
+        $machineToken = $null
     }
 }
 elseif ($SkipTokenPrompt) {
     Write-Host 'Skipped NovelAI token setup because -SkipTokenPrompt was supplied.'
 }
-
 Write-Host 'Restart the agent, or reload its skills, so it can see the installation.'

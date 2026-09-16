@@ -9,7 +9,7 @@ Use the bundled standard-library client at `scripts/novelai_image.py`. It covers
 
 ## Before a request
 
-- Require a token stored as `NovelAISkill:NOVELAI_API_TOKEN` in Windows Credential Manager. `NOVELAI_API_TOKEN` remains a fallback for non-Windows or unattended environments. Never ask the user to paste a token into chat, put it in a command, print it, or save it in the workspace.
+- Require `NOVELAI_API_TOKEN`. On Windows, the installer stores it in the machine environment so sandboxed agent accounts can read it directly even when the process did not inherit it. The previous `NovelAISkill:NOVELAI_API_TOKEN` Windows Credential Manager entry remains a legacy fallback for non-sandboxed runs. Never ask the user to paste a token into chat, put it in a command, print it, or save it in the workspace.
 - Keep the base URL at `https://image.novelai.net`. Never send a real token to a custom host; the client blocks custom hosts unless `--allow-custom-host` is explicitly supplied for local/mock testing.
 - Treat the user's prompt as the required human initiation. Never create unattended generation loops, scheduled generation, or load-amplifying retries; NovelAI's API documentation prohibits automated excessive generation.
 - A generation may spend Anlas. Resolve material ambiguities before a paid call and state the final model, prompt summary, resolution, steps, guidance, and sample count. One explicit request authorizes one call, including its requested batch.
@@ -75,7 +75,7 @@ Run a local validation before every generation call. This expands Prompt Chunks 
 python scripts/novelai_image.py generate --request cache/requests/request.json --dry-run
 ```
 
-Then make exactly one live call after resolving validation errors. On 401, explain how to rerun the installer to update the stored credential without displaying it. On 402, report insufficient Anlas. On 429 or 5xx, report the correlation ID and ask before retrying a request that may be billable.
+Then make exactly one live call after resolving validation errors. On 401, explain how to rerun the installer as administrator to update the machine token without displaying it. On 402, report insufficient Anlas. On 429 or 5xx, report the correlation ID and ask before retrying a request that may be billable.
 
 ## Deliver results
 

@@ -20,20 +20,23 @@ SPEC.loader.exec_module(CLIENT)
 
 
 class ClientTests(unittest.TestCase):
-    def test_default_auth_prefers_windows_credential(self):
-        previous = os.environ.get("NOVELAI_API_TOKEN")
-        os.environ["NOVELAI_API_TOKEN"] = "environment-secret"
-        try:
-            with mock.patch.object(CLIENT, "read_windows_credential", return_value="vault-secret"):
-                self.assertEqual(
-                    CLIENT.auth_header("NOVELAI_API_TOKEN"),
-                    "Bearer vault-secret",
-                )
-        finally:
-            if previous is None:
-                os.environ.pop("NOVELAI_API_TOKEN", None)
-            else:
-                os.environ["NOVELAI_API_TOKEN"] = previous
+    def test_default_auth_prefers_process_environment(self):
+        with mock.patch.dict(os.environ, {"NOVELAI_API_TOKEN": "environment-secret"}, clear=True), mock.patch.object(
+            CLIENT, "read_windows_machine_environment", return_value="machine-secret"
+        ), mock.patch.object(CLIENT, "read_windows_credential", return_value="vault-secret"):
+            self.assertEqual(CLIENT.auth_header("NOVELAI_API_TOKEN"), "Bearer environment-secret")
+
+    def test_default_auth_reads_machine_environment_without_inheritance(self):
+        with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(
+            CLIENT, "read_windows_machine_environment", return_value="machine-secret"
+        ), mock.patch.object(CLIENT, "read_windows_credential", return_value="vault-secret"):
+            self.assertEqual(CLIENT.auth_header("NOVELAI_API_TOKEN"), "Bearer machine-secret")
+
+    def test_default_auth_keeps_credential_manager_as_legacy_fallback(self):
+        with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(
+            CLIENT, "read_windows_machine_environment", return_value=None
+        ), mock.patch.object(CLIENT, "read_windows_credential", return_value="vault-secret"):
+            self.assertEqual(CLIENT.auth_header("NOVELAI_API_TOKEN"), "Bearer vault-secret")
 
     def test_file_placeholder_is_recursive_and_relative(self):
         with tempfile.TemporaryDirectory() as folder:

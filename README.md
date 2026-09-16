@@ -12,7 +12,7 @@ NovelAI의 공식 Image Generation API를 Codex, Claude, GitHub Copilot에서 �
 - Upscale, tag suggestions, 스트리밍 생성
 - 공식 API에 새 필드/엔드포인트가 추가될 때를 위한 raw JSON/endpoint 호출
 
-API 호출 도구는 Python 표준 라이브러리만 사용합니다. Windows에서는 토큰을 파일이나 환경 변수 대신 Windows 자격 증명 관리자에 저장합니다.
+API 호출 도구는 Python 표준 라이브러리만 사용합니다. Windows에서는 격리된 에이전트 계정도 읽을 수 있도록 토큰을 시스템 범위 환경 변수에 저장하고, 실행 시 Windows 시스템 저장소에서 직접 조회합니다.
 
 ## 설치
 
@@ -34,7 +34,7 @@ install.cmd
 - Space: 설치 항목 체크 또는 해제
 - Enter: 선택 확정 후 설치
 
-처음에는 세 플랫폼이 모두 체크되어 있습니다. 설치가 끝나면 NovelAI Persistent API Token을 숨김 입력으로 받고 Windows 자격 증명 관리자에 저장합니다.
+처음에는 세 플랫폼이 모두 체크되어 있습니다. 설치가 끝나면 NovelAI Persistent API Token을 숨김 입력으로 받고 Windows 시스템 범위 환경 변수에 저장합니다. 이 작업에는 관리자 권한이 필요합니다.
 
 방향키 선택 화면에서 체크한 플랫폼에 기존 설치가 있으면 해당 `novelai-image` 폴더를 업데이트한 뒤 토큰 입력 단계로 계속 진행합니다. 설치 중 오류가 발생하면 `install.cmd` 창이 즉시 닫히지 않고 오류를 확인할 수 있게 대기합니다.
 
@@ -69,15 +69,15 @@ install.cmd
 
 ## 인증
 
-설치기가 NovelAI Persistent API Token을 숨김 입력으로 받고 Windows 자격 증명 관리자의 `NovelAISkill:NOVELAI_API_TOKEN` 항목에 저장합니다. 이미 저장된 토큰이 있으면 Enter만 눌러 기존 값을 유지할 수 있습니다. 성공적으로 저장되면 과거 설치기가 만든 사용자 범위 `NOVELAI_API_TOKEN` 환경 변수는 제거됩니다.
+설치기가 NovelAI Persistent API Token을 숨김 입력으로 받고 시스템 범위 `NOVELAI_API_TOKEN`에 저장합니다. 이미 저장된 토큰이 있으면 Enter만 눌러 기존 값을 유지할 수 있습니다. 시스템 범위 저장에는 관리자 권한이 필요합니다.
 
-API 클라이언트는 실행할 때마다 자격 증명 관리자에서 토큰을 읽으며 화면이나 로그에 출력하지 않습니다. 비 Windows 환경과 자동화 환경에서는 `NOVELAI_API_TOKEN`을 대체 수단으로 사용할 수 있습니다. 현재 PowerShell 세션에서만 임시로 설정하는 예:
+API 클라이언트는 현재 프로세스 환경 변수를 먼저 확인하고, 없으면 Windows 시스템 환경 변수 저장소를 직접 조회합니다. 이전 버전의 Windows 자격 증명 관리자 항목은 일반 사용자 실행을 위한 마지막 대체 경로로 유지됩니다. 토큰은 화면이나 로그에 출력하지 않습니다. 비 Windows 환경과 자동화 환경에서는 현재 프로세스의 `NOVELAI_API_TOKEN`을 사용합니다. 현재 PowerShell 세션에서만 임시로 설정하는 예:
 
 ```powershell
 $env:NOVELAI_API_TOKEN = Read-Host 'NovelAI Persistent API Token'
 ```
 
-설치 후 에이전트를 재시작하거나 스킬 목록을 새로고침한 다음 `novelai-image` 스킬을 지정하거나 NovelAI 이미지 생성을 요청하세요. 토큰을 변경한 경우에는 에이전트를 재시작할 필요가 없습니다.
+설치 후 스킬 목록을 새로고침하거나 에이전트를 재시작한 다음 `novelai-image` 스킬을 지정하거나 NovelAI 이미지 생성을 요청하세요. 토큰을 변경한 경우에는 에이전트를 재시작할 필요가 없습니다.
 
 ## 직접 확인
 
