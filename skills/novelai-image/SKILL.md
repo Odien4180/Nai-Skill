@@ -63,20 +63,22 @@ Names are case-sensitive. Chunks may contain nested `!macro:Name!` references. M
 
 ## Build payloads safely
 
-Create a JSON request in the user's output/work directory. Any value written as `{"$file":"relative/or/absolute/path"}` is replaced recursively with that file's base64, which works for input images, masks, Vibe encodings, and reference-image arrays. Relative paths resolve from the request JSON's directory.
+Keep generated artifacts inside the installed skill. Create request JSON under `cache/requests/`; relative `$file` paths resolve from that request file's directory, so prefer absolute source-image paths when the inputs live elsewhere. Any value written as `{"$file":"relative/or/absolute/path"}` is replaced recursively with that file's base64, which works for input images, masks, Vibe encodings, and reference-image arrays.
+
+Unless the user explicitly requests another destination, omit output path arguments. The client creates a unique run directory under `cache/outputs/<operation>/` for generated images, manifests, streams, Vibe encodings, augmentations, upscales, and raw responses. The installer preserves the entire cache during updates.
 
 Prefer the user's explicit model and parameters. When unspecified, consult the current official docs instead of assuming that the names or limits in the reference are still current. Keep unknown official fields intact; do not narrow a request to only familiar options.
 
 Run a local validation before every generation call. This expands Prompt Chunks and rejects known schema type errors before a request can spend Anlas:
 
 ```text
-python scripts/novelai_image.py generate --request request.json --output-dir output --dry-run
+python scripts/novelai_image.py generate --request cache/requests/request.json --dry-run
 ```
 
 Then make exactly one live call after resolving validation errors. On 401, explain how to rerun the installer to update the stored credential without displaying it. On 402, report insufficient Anlas. On 429 or 5xx, report the correlation ID and ask before retrying a request that may be billable.
 
 ## Deliver results
 
-Save every returned image plus `manifest.json` in the requested output directory. Preserve seed/index metadata. For streaming, return the saved `.sse` transcript and any final artifact the response exposes. Show the resulting images with absolute paths when the host supports inline images, and summarize the model, seed, dimensions, and major settings used.
+Save every returned image plus `manifest.json` in the automatic per-run cache directory unless the user explicitly requested another destination. Preserve seed/index metadata. For streaming, return the saved `.sse` transcript and any final artifact the response exposes. Show the resulting images with absolute paths when the host supports inline images, and summarize the model, seed, dimensions, and major settings used.
 
 Official sources: [Image guide](https://docs.novelai.net/en/image/), [Image API schema](https://image.novelai.net/docs/index.html), and [Terms](https://novelai.net/terms).

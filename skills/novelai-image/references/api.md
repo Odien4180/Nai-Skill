@@ -5,14 +5,14 @@ This reference reflects NovelAI's official Swagger schema checked on 2026-09-16.
 ## Client commands
 
 ```text
-python scripts/novelai_image.py generate --request request.json --output-dir out
-python scripts/novelai_image.py generate --request request.json --output-dir out --stream
-python scripts/novelai_image.py encode-vibe --request vibe.json --output vibe.bin
-python scripts/novelai_image.py augment --request director.json --output-dir out
-python scripts/novelai_image.py upscale --request upscale.json --output-dir out
+python scripts/novelai_image.py generate --request cache/requests/request.json
+python scripts/novelai_image.py generate --request cache/requests/request.json --stream
+python scripts/novelai_image.py encode-vibe --request cache/requests/vibe.json
+python scripts/novelai_image.py augment --request cache/requests/director.json
+python scripts/novelai_image.py upscale --request cache/requests/upscale.json
 python scripts/novelai_image.py suggest-tags --model MODEL --prompt "blue hai" --lang en
 python scripts/novelai_image.py models
-python scripts/novelai_image.py raw --method POST --path /ai/new-endpoint --request body.json --output response.bin
+python scripts/novelai_image.py raw --method POST --path /ai/new-endpoint --request cache/requests/body.json
 python scripts/novelai_image.py chunks list
 ```
 
@@ -31,6 +31,8 @@ All commands accept `--base-url`, but a non-official host additionally requires 
 | `models` | `GET /oa/v1/models` | JSON model list exposed by the service |
 
 Authorization is `Authorization: Bearer <persistent API token>`. The client adds `Bearer` if absent and sends a six-character `x-correlation-id`.
+
+When no explicit output path is supplied, artifacts are written to a unique directory under the installed skill's `cache/outputs/<operation>/`. Request JSON belongs under `cache/requests/`. Explicit `--output-dir` and `--output` still override these defaults when the user asks for another destination.
 
 Before either a dry run or live request, the client validates known parameter types from the published schema. In particular, `tag_hint_qt`, `tag_hint_uc_preset`, and `ucPreset` are integers, while `tag_hint_transparent_background` and `straight_alpha` are booleans. JSON booleans are not accepted for integer hint fields. `qualityToggle` remains a separate boolean field.
 

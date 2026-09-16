@@ -16,6 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +24,11 @@ from typing import Any
 DEFAULT_BASE_URL = "https://image.novelai.net"
 DEFAULT_TOKEN_ENV = "NOVELAI_API_TOKEN"
 WINDOWS_CREDENTIAL_TARGET = "NovelAISkill:NOVELAI_API_TOKEN"
-DEFAULT_CHUNK_FILE = Path(__file__).resolve().parents[1] / "cache" / "prompt-chunks.json"
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+CACHE_ROOT = SKILL_ROOT / "cache"
+DEFAULT_CHUNK_FILE = CACHE_ROOT / "prompt-chunks.json"
+DEFAULT_OUTPUT_ROOT = CACHE_ROOT / "outputs"
+DEFAULT_REQUEST_ROOT = CACHE_ROOT / "requests"
 PROMPT_CHUNK_PATTERN = re.compile(r"!macro:([^!\r\n]+)!")
 PROMPT_TEXT_KEYS = {
     "input",
@@ -373,6 +378,30 @@ def ensure_dir(path_text: str) -> Path:
     return path
 
 
+def default_run_name() -> str:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"{timestamp}-{secrets.token_hex(3)}"
+
+
+def resolve_output_dir(path_text: str | None, operation: str) -> Path:
+    if path_text:
+        return ensure_dir(path_text)
+    return ensure_dir(str(DEFAULT_OUTPUT_ROOT / operation / default_run_name()))
+
+
+def resolve_output_file(
+    path_text: str | None,
+    operation: str,
+    filename: str,
+) -> Path:
+    if path_text:
+        destination = Path(path_text).expanduser().resolve()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        return destination
+    output_dir = resolve_output_dir(None, operation)
+    return output_dir / filename
+
+
 def image_extension(data: bytes) -> str:
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         return ".png"
@@ -481,12 +510,12 @@ def command_generate(args: argparse.Namespace) -> None:
     payload = load_payload(args)
     if maybe_dry_run(args, payload):
         return
-    output_dir = ensure_dir(args.output_dir)
     if args.stream:
         data, _content_type, cid, _status = request_bytes(
             method="POST", base_url=args.base_url, path="/ai/generate-image-stream",
             token_env=args.token_env, payload=payload, accept="text/event-stream", timeout=args.timeout,
         )
+        output_dir = resolve_output_dir(args.output_dir, "generate-stream")
         destination = output_dir / "generation.sse"
         destination.write_bytes(data)
         output_summary([destination], cid)
@@ -495,6 +524,7 @@ def command_generate(args: argparse.Namespace) -> None:
         method="POST", base_url=args.base_url, path="/ai/generate-image",
         token_env=args.token_env, payload=payload, accept=args.accept, timeout=args.timeout,
     )
+    output_dir = resolve_output_dir(args.output_dir, "generate")
     paths = write_zip(data, output_dir, cid, status) if "zip" in content_type else write_json_images(data, output_dir, cid, status)
     output_summary(paths, cid)
 
@@ -507,22 +537,26 @@ def command_encode_vibe(args: argparse.Namespace) -> None:
         method="POST", base_url=args.base_url, path="/ai/encode-vibe",
         token_env=args.token_env, payload=payload, accept="application/binary", timeout=args.timeout,
     )
-    destination = Path(args.output).expanduser().resolve()
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination = resolve_output_file(args.output, "encode-vibe", "vibe.bin")
     destination.write_bytes(data)
     output_summary([destination], cid)
 
 
-def command_image_json_or_zip(args: argparse.Namespace, path: str, force_zip: bool = False) -> None:
+def command_image_json_or_zip(
+    args: argparse.Namespace,
+    path: str,
+    operation: str,
+    force_zip: bool = False,
+) -> None:
     payload = load_payload(args)
     if maybe_dry_run(args, payload):
         return
-    output_dir = ensure_dir(args.output_dir)
     accept = "application/zip" if force_zip else args.accept
     data, content_type, cid, status = request_bytes(
         method="POST", base_url=args.base_url, path=path, token_env=args.token_env,
         payload=payload, accept=accept, timeout=args.timeout,
     )
+    output_dir = resolve_output_dir(args.output_dir, operation)
     paths = write_zip(data, output_dir, cid, status) if force_zip or "zip" in content_type else write_json_images(data, output_dir, cid, status)
     output_summary(paths, cid)
 
@@ -590,8 +624,8 @@ def command_raw(args: argparse.Namespace) -> None:
         method=args.method, base_url=args.base_url, path=args.path,
         token_env=args.token_env, payload=payload, accept=args.accept, timeout=args.timeout,
     )
-    destination = Path(args.output).expanduser().resolve()
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    suffix = "json" if content_type == "application/json" else "bin"
+    destination = resolve_output_file(args.output, "raw", f"response.{suffix}")
     if content_type == "application/json":
         destination.write_text(json.dumps(json.loads(data), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     else:
@@ -630,23 +664,23 @@ def build_parser() -> argparse.ArgumentParser:
     request_common = request_parser()
 
     generate = sub.add_parser("generate", parents=[common, request_common])
-    generate.add_argument("--output-dir", required=True)
+    generate.add_argument("--output-dir")
     generate.add_argument("--accept", choices=["application/json", "application/zip"], default="application/json")
     generate.add_argument("--stream", action="store_true")
     generate.set_defaults(handler=command_generate)
 
     vibe = sub.add_parser("encode-vibe", parents=[common, request_common])
-    vibe.add_argument("--output", required=True)
+    vibe.add_argument("--output")
     vibe.set_defaults(handler=command_encode_vibe)
 
     augment = sub.add_parser("augment", parents=[common, request_common])
-    augment.add_argument("--output-dir", required=True)
-    augment.set_defaults(handler=lambda args: command_image_json_or_zip(args, "/ai/augment-image", True))
+    augment.add_argument("--output-dir")
+    augment.set_defaults(handler=lambda args: command_image_json_or_zip(args, "/ai/augment-image", "augment", True))
 
     upscale = sub.add_parser("upscale", parents=[common, request_common])
-    upscale.add_argument("--output-dir", required=True)
+    upscale.add_argument("--output-dir")
     upscale.add_argument("--accept", choices=["application/json", "application/zip"], default="application/json")
-    upscale.set_defaults(handler=lambda args: command_image_json_or_zip(args, "/ai/upscale"))
+    upscale.set_defaults(handler=lambda args: command_image_json_or_zip(args, "/ai/upscale", "upscale"))
 
     suggest = sub.add_parser("suggest-tags", parents=[common])
     suggest.add_argument("--model", required=True)
@@ -682,7 +716,7 @@ def build_parser() -> argparse.ArgumentParser:
     raw.add_argument("--path", required=True)
     raw.add_argument("--request", help="optional JSON path, or - for stdin")
     raw.add_argument("--accept", default="application/json")
-    raw.add_argument("--output", required=True)
+    raw.add_argument("--output")
     raw.add_argument("--dry-run", action="store_true")
     raw.set_defaults(handler=command_raw)
     return parser

@@ -161,6 +161,30 @@ class ClientTests(unittest.TestCase):
         args = CLIENT.build_parser().parse_args(["chunks", "list"])
         self.assertIsNone(args.file)
 
+    def test_output_arguments_are_optional_and_default_to_skill_cache(self):
+        generate_args = CLIENT.build_parser().parse_args(
+            ["generate", "--request", "request.json"]
+        )
+        vibe_args = CLIENT.build_parser().parse_args(
+            ["encode-vibe", "--request", "vibe.json"]
+        )
+        raw_args = CLIENT.build_parser().parse_args(
+            ["raw", "--method", "GET", "--path", "/test"]
+        )
+        self.assertIsNone(generate_args.output_dir)
+        self.assertIsNone(vibe_args.output)
+        self.assertIsNone(raw_args.output)
+
+    def test_default_output_directory_is_unique_and_inside_cache(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / "outputs"
+            with mock.patch.object(CLIENT, "DEFAULT_OUTPUT_ROOT", root):
+                first = CLIENT.resolve_output_dir(None, "generate")
+                second = CLIENT.resolve_output_dir(None, "generate")
+            self.assertEqual(first.parent, root / "generate")
+            self.assertEqual(second.parent, root / "generate")
+            self.assertNotEqual(first, second)
+
     def test_json_images_and_manifest_are_written(self):
         png = b"\x89PNG\r\n\x1a\nmock"
         response = json.dumps(
