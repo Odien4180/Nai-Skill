@@ -233,6 +233,66 @@ def validate_known_payload_types(payload: Any) -> None:
             raise CliError(f"parameters.{field} must be a number")
 
 
+def validate_generation_payload(payload: Any) -> None:
+    """Validate the canonical generate-image request contract."""
+    if not isinstance(payload, dict):
+        raise CliError("generation request must be a JSON object")
+    for field in ("action", "input", "model", "parameters"):
+        if field not in payload:
+            raise CliError(f"generation request is missing required field: {field}")
+    for field in ("action", "input", "model"):
+        if not isinstance(payload[field], str) or not payload[field].strip():
+            raise CliError(f"generation request.{field} must be a non-empty string")
+    parameters = payload["parameters"]
+    if not isinstance(parameters, dict):
+        raise CliError("parameters must be a JSON object")
+    required = ("prompt", "negative_prompt", "width", "height", "steps", "scale", "sampler", "n_samples")
+    for field in required:
+        if field not in parameters:
+            raise CliError(f"generation request is missing required field: parameters.{field}")
+    for field in ("prompt", "negative_prompt", "sampler"):
+        if not isinstance(parameters[field], str):
+            raise CliError(f"parameters.{field} must be a string")
+    if payload["input"] != parameters["prompt"]:
+        raise CliError("generation request input and parameters.prompt must be identical")
+    for name in ("v4_prompt", "v4_negative_prompt"):
+        if name not in parameters:
+            continue
+        structured = parameters[name]
+        caption = structured.get("caption") if isinstance(structured, dict) else None
+        if not isinstance(caption, dict):
+            raise CliError(f"parameters.{name}.caption must be an object")
+        if not isinstance(caption.get("base_caption"), str):
+            raise CliError(f"parameters.{name}.caption.base_caption must be a string")
+        characters = caption.get("char_captions")
+        if not isinstance(characters, list):
+            raise CliError(f"parameters.{name}.caption.char_captions must be an array")
+        for index, character in enumerate(characters):
+            prefix = f"parameters.{name}.caption.char_captions[{index}]"
+            if not isinstance(character, dict) or not isinstance(character.get("char_caption"), str):
+                raise CliError(f"{prefix}.char_caption must be a string")
+            centers = character.get("centers", [])
+            if not isinstance(centers, list):
+                raise CliError(f"{prefix}.centers must be an array")
+            for center_index, center in enumerate(centers):
+                center_prefix = f"{prefix}.centers[{center_index}]"
+                if not isinstance(center, dict) or set(center) != {"x", "y"}:
+                    raise CliError(f"{center_prefix} must contain exactly x and y")
+                for axis in ("x", "y"):
+                    value = center[axis]
+                    if not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value <= 1:
+                        raise CliError(f"{center_prefix}.{axis} must be between 0 and 1")
+        for flag in ("use_coords", "use_order"):
+            if not isinstance(structured.get(flag), bool):
+                raise CliError(f"parameters.{name}.{flag} must be a boolean")
+        if structured["use_coords"] and any(not character.get("centers") for character in characters):
+            raise CliError(f"parameters.{name} requires centers for every character when use_coords is true")
+    if "v4_prompt" in parameters and parameters["v4_prompt"]["caption"]["base_caption"] != parameters["prompt"]:
+        raise CliError("parameters.v4_prompt.caption.base_caption and parameters.prompt must be identical")
+    if "v4_negative_prompt" in parameters and parameters["v4_negative_prompt"]["caption"]["base_caption"] != parameters["negative_prompt"]:
+        raise CliError("parameters.v4_negative_prompt.caption.base_caption and parameters.negative_prompt must be identical")
+
+
 def summarize(value: Any) -> Any:
     if isinstance(value, dict):
         result = {}
@@ -533,6 +593,7 @@ def maybe_dry_run(args: argparse.Namespace, payload: Any) -> bool:
 
 def command_generate(args: argparse.Namespace) -> None:
     payload = load_payload(args)
+    validate_generation_payload(payload)
     if maybe_dry_run(args, payload):
         return
     if args.stream:

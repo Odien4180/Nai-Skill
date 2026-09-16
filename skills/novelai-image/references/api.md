@@ -54,6 +54,12 @@ Use `chunks list|get|set|delete|expand` to manage it. Generation automatically l
 
 ## Generation envelope
 
+Generation requests use a fixed canonical schema. The client requires
+`input`, `parameters.prompt`, and the V4/V5 positive `base_caption` to be
+identical. Negative prompt copies must also match. Character-only details
+belong in `char_captions`; when `use_coords` is true, every character needs a
+normalized `{x, y}` center. A dry run rejects drift before a paid request.
+
 ```json
 {
   "action": "generate",

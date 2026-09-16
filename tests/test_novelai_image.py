@@ -85,6 +85,24 @@ class ClientTests(unittest.TestCase):
                 {"parameters": {"scale": True}}
             )
 
+    def canonical_generation_payload(self):
+        return {"action": "generate", "input": "a harbor", "model": "nai-diffusion-5-full", "parameters": {"prompt": "a harbor", "negative_prompt": "blurry", "width": 832, "height": 1216, "steps": 28, "scale": 4.5, "sampler": "k_euler_ancestral", "n_samples": 1, "v4_prompt": {"caption": {"base_caption": "a harbor", "char_captions": [{"char_caption": "1girl", "centers": [{"x": 0.5, "y": 0.5}]}]}, "use_coords": True, "use_order": True}, "v4_negative_prompt": {"caption": {"base_caption": "blurry", "char_captions": []}, "use_coords": True, "use_order": True, "legacy_uc": False}}}
+
+    def test_canonical_generation_schema_accepts_synchronized_prompts(self):
+        CLIENT.validate_generation_payload(self.canonical_generation_payload())
+
+    def test_generation_schema_rejects_prompt_drift(self):
+        payload = self.canonical_generation_payload()
+        payload["parameters"]["prompt"] = "a different prompt"
+        with self.assertRaisesRegex(CLIENT.CliError, "must be identical"):
+            CLIENT.validate_generation_payload(payload)
+
+    def test_generation_schema_rejects_missing_character_coordinates(self):
+        payload = self.canonical_generation_payload()
+        del payload["parameters"]["v4_prompt"]["caption"]["char_captions"][0]["centers"]
+        with self.assertRaisesRegex(CLIENT.CliError, "requires centers"):
+            CLIENT.validate_generation_payload(payload)
+
     def test_prompt_chunks_expand_nested_prompt_fields(self):
         chunks = {
             "Hero": "1girl, !macro:Hair!",
