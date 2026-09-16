@@ -86,7 +86,7 @@ class ClientTests(unittest.TestCase):
             )
 
     def canonical_generation_payload(self):
-        return {"action": "generate", "input": "a harbor", "model": "nai-diffusion-5-full", "parameters": {"prompt": "a harbor", "negative_prompt": "blurry", "width": 832, "height": 1216, "steps": 28, "scale": 4.5, "sampler": "k_euler_ancestral", "n_samples": 1, "v4_prompt": {"caption": {"base_caption": "a harbor", "char_captions": [{"char_caption": "1girl", "centers": [{"x": 0.5, "y": 0.5}]}]}, "use_coords": True, "use_order": True}, "v4_negative_prompt": {"caption": {"base_caption": "blurry", "char_captions": []}, "use_coords": True, "use_order": True, "legacy_uc": False}}}
+        return {"action": "generate", "input": "a harbor", "model": "nai-diffusion-5-full", "parameters": {"params_version": 4, "prompt": "a harbor", "negative_prompt": "blurry", "width": 832, "height": 1216, "steps": 28, "scale": 4.5, "sampler": "k_euler_ancestral", "n_samples": 1, "v4_prompt": {"caption": {"base_caption": "a harbor", "char_captions": [{"char_caption": "1girl", "centers": [{"x": 0.5, "y": 0.5}]}]}, "use_coords": True, "use_order": True}, "v4_negative_prompt": {"caption": {"base_caption": "blurry", "char_captions": []}, "use_coords": True, "use_order": True, "legacy_uc": False}}}
 
     def test_canonical_generation_schema_accepts_synchronized_prompts(self):
         CLIENT.validate_generation_payload(self.canonical_generation_payload())
@@ -114,6 +114,34 @@ class ClientTests(unittest.TestCase):
         payload = self.canonical_generation_payload()
         del payload["parameters"]["v4_prompt"]["caption"]["char_captions"][0]["centers"]
         with self.assertRaisesRegex(CLIENT.CliError, "requires centers"):
+            CLIENT.validate_generation_payload(payload)
+
+    def test_v5_generation_requires_structured_v4_fields(self):
+        payload = self.canonical_generation_payload()
+        del payload["parameters"]["v4_prompt"]
+        with self.assertRaisesRegex(CLIENT.CliError, "requires parameters.v4_prompt"):
+            CLIENT.validate_generation_payload(payload)
+
+    def test_alpha_transparency_requires_v5_png_and_prompt_tag(self):
+        payload = self.canonical_generation_payload()
+        payload["parameters"].update({"tag_hint_transparent_background": True, "straight_alpha": True, "image_format": "png"})
+        with self.assertRaisesRegex(CLIENT.CliError, "requires transparent background"):
+            CLIENT.validate_generation_payload(payload)
+        prompt = "a harbor, transparent background"
+        payload["input"] = prompt
+        payload["parameters"]["prompt"] = prompt
+        payload["parameters"]["v4_prompt"]["caption"]["base_caption"] = prompt
+        CLIENT.validate_generation_payload(payload)
+
+    def test_alpha_transparency_rejects_v45(self):
+        payload = self.canonical_generation_payload()
+        prompt = "a harbor, transparent background"
+        payload["model"] = "nai-diffusion-4-5-full"
+        payload["input"] = prompt
+        payload["parameters"]["prompt"] = prompt
+        payload["parameters"]["v4_prompt"]["caption"]["base_caption"] = prompt
+        payload["parameters"].update({"tag_hint_transparent_background": True, "straight_alpha": True, "image_format": "png"})
+        with self.assertRaisesRegex(CLIENT.CliError, "only by V5"):
             CLIENT.validate_generation_payload(payload)
 
     def test_prompt_chunks_expand_nested_prompt_fields(self):

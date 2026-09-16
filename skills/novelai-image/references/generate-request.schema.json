@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.skills/novelai-image/generate-request.schema.json",
+  "title": "Canonical NovelAI image generation request",
+  "description": "Swagger field types plus canonical V4/V4.5/V5 and alpha-transparency invariants.",
+  "type": "object",
+  "required": ["action", "input", "model", "parameters"],
+  "properties": {
+    "action": {"type": "string", "minLength": 1},
+    "input": {"type": "string", "minLength": 1},
+    "model": {"type": "string", "minLength": 1},
+    "url": {"type": "string"},
+    "parameters": {"$ref": "#/$defs/requestParameters"}
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {"properties": {"model": {"pattern": "^nai-diffusion-(4(-5)?|5)(-|$)"}}},
+      "then": {
+        "properties": {
+          "parameters": {
+            "required": ["params_version", "v4_prompt", "v4_negative_prompt"],
+            "properties": {"params_version": {"const": 4}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "parameters": {
+            "anyOf": [
+              {"properties": {"tag_hint_transparent_background": {"const": true}}, "required": ["tag_hint_transparent_background"]},
+              {"properties": {"straight_alpha": {"const": true}}, "required": ["straight_alpha"]}
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "model": {"pattern": "^nai-diffusion-5(-|$)"},
+          "input": {"pattern": "transparent background|has alpha|alpha transparency"},
+          "parameters": {
+            "required": ["tag_hint_transparent_background", "straight_alpha", "image_format", "v4_prompt"],
+            "properties": {
+              "tag_hint_transparent_background": {"const": true},
+              "straight_alpha": {"const": true},
+              "image_format": {"const": "png"},
+              "prompt": {"pattern": "transparent background|has alpha|alpha transparency"}
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "coordinates": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {"x": {"type": "number", "minimum": 0, "maximum": 1}, "y": {"type": "number", "minimum": 0, "maximum": 1}},
+      "additionalProperties": false
+    },
+    "characterCaption": {
+      "type": "object",
+      "required": ["char_caption"],
+      "properties": {"char_caption": {"type": "string"}, "centers": {"type": "array", "items": {"$ref": "#/$defs/coordinates"}}},
+      "additionalProperties": false
+    },
+    "conditionInput": {
+      "type": "object",
+      "required": ["caption", "use_coords", "use_order"],
+      "properties": {
+        "caption": {"type": "object", "required": ["base_caption", "char_captions"], "properties": {"base_caption": {"type": "string"}, "char_captions": {"type": "array", "items": {"$ref": "#/$defs/characterCaption"}}}, "additionalProperties": false},
+        "legacy_uc": {"type": "boolean"}, "use_coords": {"type": "boolean"}, "use_order": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "requestParameters": {
+      "type": "object",
+      "required": ["prompt", "negative_prompt", "width", "height", "steps", "scale", "sampler", "n_samples"],
+      "properties": {
+        "add_original_image": {"type": "boolean"}, "cfg_rescale": {"type": "number"}, "color_correct": {"type": "boolean"},
+        "controlnet_condition": {"type": "string"}, "controlnet_model": {"type": "string"}, "controlnet_strength": {"type": "number"},
+        "deliberate_euler_ancestral_bug": {"type": "boolean"}, "dynamic_thresholding": {"type": "boolean"}, "extra_noise_seed": {"type": "integer"},
+        "height": {"type": "integer", "minimum": 1}, "image": {"type": "string"}, "image_format": {"enum": ["png", "webp"]},
+        "legacy": {"type": "boolean"}, "legacy_v3_extend": {"type": "boolean"}, "mask": {"type": "string"},
+        "n_samples": {"type": "integer", "minimum": 1}, "negative_prompt": {"type": "string"}, "noise": {"type": "number"},
+        "noise_schedule": {"type": "string"}, "params_version": {"type": "integer"}, "prefer_brownian": {"type": "boolean"},
+        "prompt": {"type": "string"}, "qualityToggle": {"type": "boolean"}, "sampler": {"type": "string"}, "scale": {"type": "number"},
+        "seed": {"type": "integer"}, "skip_cfg_above_sigma": {"type": "number"}, "sm": {"type": "boolean"}, "sm_dyn": {"type": "boolean"},
+        "steps": {"type": "number"}, "straight_alpha": {"type": "boolean"}, "stream": {"enum": ["msgpack", "sse"]},
+        "strength": {"type": "number"}, "tag_hint_qt": {"type": "integer"}, "tag_hint_transparent_background": {"type": "boolean"},
+        "tag_hint_uc_preset": {"type": "integer"}, "ucPreset": {"type": "integer"}, "upscaled_enhance": {"type": "boolean"},
+        "v4_negative_prompt": {"$ref": "#/$defs/conditionInput"}, "v4_prompt": {"$ref": "#/$defs/conditionInput"}, "width": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": true
+    }
+  }
+}

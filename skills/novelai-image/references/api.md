@@ -54,13 +54,18 @@ Use `chunks list|get|set|delete|expand` to manage it. Generation automatically l
 
 ## Generation envelope
 
-Generation requests use a fixed canonical schema. The client requires
+Generation requests use the canonical JSON Schema in
+[`generate-request.schema.json`](generate-request.schema.json). It mirrors the
+field types published by the live Swagger and adds the V4+ invariants needed by
+the current model families. The client requires
 `input`, `parameters.prompt`, and the V4/V5 positive `base_caption` to be
 identical. Negative prompt copies must also match. Character-only details
 belong in `char_captions`; when `use_coords` is true, every character needs a
 normalized `{x, y}` center. A dry run rejects drift before a paid request.
 When `model` is omitted, the client inserts the default
 `nai-diffusion-5-full`; an explicitly supplied model is never overwritten.
+V4, V4.5, and V5 canonical requests use `params_version: 4` plus both
+`v4_prompt` and `v4_negative_prompt`.
 
 ```json
 {
@@ -68,6 +73,7 @@ When `model` is omitted, the client inserts the default
   "input": "1girl, red hair, cinematic lighting",
   "model": "nai-diffusion-5-full",
   "parameters": {
+    "params_version": 4,
     "prompt": "1girl, red hair, cinematic lighting",
     "negative_prompt": "lowres, blurry",
     "width": 832,
@@ -81,7 +87,24 @@ When `model` is omitted, the client inserts the default
     "qualityToggle": true,
     "ucPreset": 0,
     "cfg_rescale": 0,
-    "image_format": "png"
+    "image_format": "png",
+    "v4_prompt": {
+      "caption": {
+        "base_caption": "1girl, red hair, cinematic lighting",
+        "char_captions": []
+      },
+      "use_coords": false,
+      "use_order": true
+    },
+    "v4_negative_prompt": {
+      "caption": {
+        "base_caption": "lowres, blurry",
+        "char_captions": []
+      },
+      "use_coords": false,
+      "use_order": true,
+      "legacy_uc": false
+    }
   }
 }
 ```
@@ -91,6 +114,25 @@ Do not treat this as a fixed preset. `model`, defaults, valid resolutions, sampl
 The official `parameters` schema currently publishes:
 
 `add_original_image`, `cfg_rescale`, `color_correct`, `controlnet_condition`, `controlnet_model`, `controlnet_strength`, `deliberate_euler_ancestral_bug`, `director_reference_descriptions`, `director_reference_images`, `director_reference_information_extracted`, `director_reference_secondary_strength_values`, `director_reference_strength_values`, `dynamic_thresholding`, `extra_noise_seed`, `height`, `image`, `image_format`, `img2img`, `legacy`, `legacy_v3_extend`, `mask`, `n_samples`, `negative_prompt`, `noise`, `noise_schedule`, `params_version`, `prefer_brownian`, `prompt`, `qualityToggle`, `reference_image`, `reference_image_multiple`, `reference_information_extracted`, `reference_information_extracted_multiple`, `reference_strength`, `reference_strength_multiple`, `sampler`, `scale`, `seed`, `skip_cfg_above_sigma`, `sm`, `sm_dyn`, `steps`, `straight_alpha`, `stream`, `strength`, `tag_hint_qt`, `tag_hint_transparent_background`, `tag_hint_uc_preset`, `ucPreset`, `upscale`, `upscaled_enhance`, `v4_negative_prompt`, `v4_prompt`, and `width`.
+
+## Alpha Transparency
+
+Official image documentation limits true alpha transparency to V5. The UI's
+Transparent BG toggle adds `transparent background` to the prompt. Swagger
+describes `tag_hint_transparent_background` as a pass-through hint that the
+server does not interpret, so the hint is not a replacement for that tag.
+
+A canonical transparent request therefore requires all of the following:
+
+- A V5 model such as `nai-diffusion-5-full`.
+- `transparent background`, `has alpha`, or `alpha transparency` in `input`,
+  `parameters.prompt`, and `v4_prompt.caption.base_caption`.
+- `tag_hint_transparent_background: true` and `straight_alpha: true`.
+- `image_format: "png"`.
+- `params_version: 4` and synchronized V4+ structured prompts.
+
+Do not carry these alpha fields into a V4/V4.5 comparison request. Those model
+families do not support true alpha output.
 
 ## Input-image modes
 

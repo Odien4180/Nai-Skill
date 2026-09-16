@@ -23,6 +23,11 @@ from typing import Any
 
 DEFAULT_BASE_URL = "https://image.novelai.net"
 DEFAULT_GENERATION_MODEL = "nai-diffusion-5-full"
+V4_PLUS_MODEL_PATTERN = re.compile(r"^nai-diffusion-(?:4(?:-5)?|5)(?:-|$)")
+V5_MODEL_PATTERN = re.compile(r"^nai-diffusion-5(?:-|$)")
+ALPHA_PROMPT_PATTERN = re.compile(
+    r"(?:transparent background|has alpha|alpha transparency)", re.IGNORECASE
+)
 DEFAULT_TOKEN_ENV = "NOVELAI_API_TOKEN"
 WINDOWS_CREDENTIAL_TARGET = "NovelAISkill:NOVELAI_API_TOKEN"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -256,6 +261,13 @@ def validate_generation_payload(payload: Any) -> None:
             raise CliError(f"parameters.{field} must be a string")
     if payload["input"] != parameters["prompt"]:
         raise CliError("generation request input and parameters.prompt must be identical")
+    model = payload["model"]
+    if V4_PLUS_MODEL_PATTERN.search(model):
+        if parameters.get("params_version") != 4:
+            raise CliError("V4/V4.5/V5 generation requires parameters.params_version = 4")
+        for name in ("v4_prompt", "v4_negative_prompt"):
+            if name not in parameters:
+                raise CliError(f"V4/V4.5/V5 generation requires parameters.{name}")
     for name in ("v4_prompt", "v4_negative_prompt"):
         if name not in parameters:
             continue
@@ -292,6 +304,16 @@ def validate_generation_payload(payload: Any) -> None:
         raise CliError("parameters.v4_prompt.caption.base_caption and parameters.prompt must be identical")
     if "v4_negative_prompt" in parameters and parameters["v4_negative_prompt"]["caption"]["base_caption"] != parameters["negative_prompt"]:
         raise CliError("parameters.v4_negative_prompt.caption.base_caption and parameters.negative_prompt must be identical")
+    alpha_requested = parameters.get("tag_hint_transparent_background") is True or parameters.get("straight_alpha") is True
+    if alpha_requested:
+        if not V5_MODEL_PATTERN.search(model):
+            raise CliError("alpha transparency is supported only by V5 models")
+        if parameters.get("tag_hint_transparent_background") is not True or parameters.get("straight_alpha") is not True:
+            raise CliError("alpha transparency requires both tag_hint_transparent_background and straight_alpha to be true")
+        if parameters.get("image_format") != "png":
+            raise CliError('alpha transparency requires parameters.image_format = "png"')
+        if not ALPHA_PROMPT_PATTERN.search(parameters["prompt"]):
+            raise CliError("alpha transparency requires transparent background, has alpha, or alpha transparency in the positive prompt")
 
 
 def apply_generation_defaults(payload: Any) -> Any:

@@ -43,6 +43,8 @@ Seed, sampler, schedule, quality toggles, and other advanced controls are option
 
 For payload fields and examples, read [references/api.md](references/api.md). For prompting and model-selection behavior, read [references/prompting.md](references/prompting.md) only when the user wants prompt help or a model recommendation.
 
+For alpha-transparent output, use a V5 model only and read the Alpha Transparency section in [references/api.md](references/api.md). The canonical request must use PNG, include `transparent background`, `has alpha`, or `alpha transparency` in the actual positive prompt, and set both `tag_hint_transparent_background` and `straight_alpha` to `true`. The hint does not add the prompt tag. Do not send alpha fields to V4 or V4.5.
+
 For inpaint/outpaint, read the inpaint section in [references/api.md](references/api.md) before building the request. Explain that this client sends the source image and mask to NovelAI; it does not paint a mask, perform Focused Inpainting crops, or composite the result locally.
 
 ## Local Prompt Chunks
